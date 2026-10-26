@@ -58,6 +58,8 @@ Nothing to set up: when the bar widget starts, it restores the **Restore at logi
   - `config.json`: Restore at login and Auto-add workspaces, title words, and apps removed from auto-add workspaces
   - `last-restore.json`: what the last restore did
   - `restore.lock`, `state.lock`: lock files
+
+  Plus one empty marker per Hyprland session, `$XDG_RUNTIME_DIR/workspace-restore-login-<uid>-<instance>`, so the login restore runs once. `$XDG_RUNTIME_DIR` is cleared at logout.
 - **Processes started:** `python3` running `wsr.py`, which runs `hyprctl` (`-j` queries and `dispatch`); `setsid` for background restores; and the apps on your lists when restoring.
 - **Polling:** the bar widget runs `wsr.py auto-add` and `wsr.py status` every 30 seconds. It reads `/proc/<pid>/cmdline` of open windows and the `.desktop` files in the XDG data dirs.
 - No network access.

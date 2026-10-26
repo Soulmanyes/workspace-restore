@@ -5,7 +5,7 @@ save [--ws N]        snapshot workspaces, their monitors and windows to layout.j
                      (--ws: re-record only workspace N, keep the rest as saved)
 status               print layout + user choices as one JSON object for the panel,
                      plus open workspaces that aren't saved yet
-set-tick WS 0|1      tick or untick a workspace for restoring at login
+set-tick 0|1 WS ...  tick or untick workspaces for restoring at login
 set-keyword KEY TEXT title keyword for one window slot (browser windows)
 candidates [--ws N]  open windows and installed apps that can be added (to N)
 add-window WS (--address ADDR | --desktop ID)
