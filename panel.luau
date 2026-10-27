@@ -449,7 +449,9 @@ local function unsavedRow(rows, ws, o)
     enabled = not busy,
     onClick = function() edit("add-window " .. ws.id .. " --address " .. shared.quote(o.address)) end })
   local tag = from ~= nil and tr("ui.state-saved-on", { ws = tostring(from.ws) }) or tr("ui.state-unsaved")
-  rows[#rows + 1] = appRow("sug-" .. o.address, COLOR.unsaved, o.icon, tostring(o.label), tostring(o.title or ""),
+  -- The key changes with the buttons: a row keeping its key while gaining
+  -- a button was drawn twice.
+  rows[#rows + 1] = appRow("sug-" .. o.address .. (from and "-move" or ""), COLOR.unsaved, o.icon, tostring(o.label), tostring(o.title or ""),
     tag, tr("ui.state-unsaved-tooltip"), buttons)
 end
 
