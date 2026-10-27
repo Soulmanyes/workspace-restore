@@ -26,7 +26,7 @@ Add the `bar` widget to a bar and click it, or open the panel with:
 noctalia msg panel-toggle soulmanyes/workspace-restore:panel
 ```
 
-The panel has one column per screen, left to right, showing each workspace on the screen it's on now. A workspace with nothing to do (every saved app open on it, nothing unsaved, on its screen) shows as one line with its app icons; the arrow shows it in full. With more workspaces than fit, the columns scroll. Each workspace that has saved apps or is open gets a card:
+The panel has one column per screen, left to right (three per row; a fourth screen starts a second row), showing each workspace on the screen it's on now. A workspace with nothing to do (every saved app open on it, nothing unsaved, on its screen) shows as one line with its app icons; the arrow shows it in full. With more workspaces than fit, the columns scroll. Each workspace that has saved apps or is open gets a card:
 
 - One list of apps, each with a coloured dot and a tag (a legend sits at the top):
   - green **open here**: saved here and open here

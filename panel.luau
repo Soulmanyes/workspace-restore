@@ -22,6 +22,8 @@ local RESTORE_WATCH_S = 75
 -- Height left for the columns: max_height in plugin.toml minus header,
 -- legend and footer.
 local BODY_MAX_H = 1100 - 330
+local SCROLLBAR_W = 14
+local MAX_COLS = 3 -- screens side by side before the next row
 local DRAG_TYPE = "wsr-workspace"
 -- App and card states. Fixed colours: the palette has no green or orange.
 local COLOR = {
@@ -801,16 +803,22 @@ local function cardHeight(ws)
   return 140 + 34 * apps + notes
 end
 
-local function tallestColumn(byScreen)
-  local tallest = 0
-  for _, list in pairs(byScreen) do
-    local h = 40 -- screen title
-    for _, ws in ipairs(list) do
-      h = h + cardHeight(ws) + 8
+-- Rough height of the columns: each row of screens is as tall as its
+-- tallest column.
+local function bodyHeight(byScreen, screens)
+  local total = 0
+  for first = 1, #screens, MAX_COLS do
+    local tallest = 0
+    for i = first, math.min(first + MAX_COLS - 1, #screens) do
+      local h = 40 -- screen title
+      for _, ws in ipairs(byScreen[screens[i].desc] or {}) do
+        h = h + cardHeight(ws) + 8
+      end
+      tallest = math.max(tallest, h)
     end
-    tallest = math.max(tallest, h)
+    total = total + tallest + (first > 1 and COL_GAP or 0)
   end
-  return tallest
+  return total
 end
 
 local function mainView()
@@ -836,13 +844,22 @@ local function mainView()
       outOfPlace[#outOfPlace + 1] = tostring(ws.id)
     end
   end
+  -- At most MAX_COLS screens side by side; more go on further rows, so
+  -- cards keep their width with many screens.
   local screens = data.screens or {}
-  local n = math.max(#screens, 1)
-  local width = math.floor((PANEL_W - 2 * (CHROME + PAD) - COL_GAP * (n - 1)) / n)
-  local columns = {}
-  for _, sc in ipairs(screens) do
-    columns[#columns + 1] = screenColumn(sc, byScreen[sc.desc] or {}, width)
+  local n = math.max(math.min(#screens, MAX_COLS), 1)
+  -- Scrolling columns leave room for the scrollbar on the right.
+  local scrolls = bodyHeight(byScreen, screens) > BODY_MAX_H
+  local width = math.floor((PANEL_W - 2 * (CHROME + PAD) - COL_GAP * (n - 1) - (scrolls and SCROLLBAR_W or 0)) / n)
+  local screenRows = {}
+  for first = 1, #screens, MAX_COLS do
+    local cols = {}
+    for i = first, math.min(first + MAX_COLS - 1, #screens) do
+      cols[#cols + 1] = screenColumn(screens[i], byScreen[screens[i].desc] or {}, width)
+    end
+    screenRows[#screenRows + 1] = ui.row({ key = "screens-" .. first, gap = COL_GAP, align = "start" }, cols)
   end
+  local body = ui.column({ gap = COL_GAP }, screenRows)
 
   local header = ui.row({ align = "center", gap = 10 }, compact(
     ui.glyph({ name = "layout-grid", size = 22, color = "primary" }),
@@ -873,30 +890,34 @@ local function mainView()
     })
   ))
 
-  local function key(mark, text)
-    return ui.row({ align = "center", gap = 5 }, {
-      mark, ui.label({ text = text, fontSize = 10, color = "on_surface_variant" }) })
+  -- Fixed widths per legend column, so the two rows line up.
+  local KEY_W = { 140, 220, 130, 130 }
+  local function key(i, mark, text)
+    return ui.row({ align = "center", gap = 5, width = KEY_W[i] }, {
+      ui.row({ width = 8, align = "center", justify = "center" }, { mark }),
+      ui.label({ text = text, fontSize = 10, color = "on_surface_variant", maxLines = 1 }) })
   end
   local function bar(color)
     return ui.column({ width = 4, height = 12, radius = 2, fill = color }, {})
   end
   local function heading(text)
-    return ui.label({ text = text, fontSize = 10, fontWeight = "bold", color = "on_surface_variant", width = 64 })
+    return ui.row({ width = 64 }, {
+      ui.label({ text = text, fontSize = 10, fontWeight = "bold", color = "on_surface_variant", maxLines = 1 }) })
   end
   local legend = ui.column({ gap = 4 }, {
     ui.row({ align = "center", gap = 14 }, {
       heading(tr("ui.legend-apps")),
-      key(dot(COLOR.here), tr("ui.legend-here")),
-      key(dot(COLOR.elsewhere), tr("ui.legend-elsewhere")),
-      key(dot(COLOR.closed), tr("ui.legend-closed")),
-      key(dot(COLOR.unsaved), tr("ui.legend-unsaved")),
+      key(1, dot(COLOR.here), tr("ui.legend-here")),
+      key(2, dot(COLOR.elsewhere), tr("ui.legend-elsewhere")),
+      key(3, dot(COLOR.closed), tr("ui.legend-closed")),
+      key(4, dot(COLOR.unsaved), tr("ui.legend-unsaved")),
     }),
     ui.row({ align = "center", gap = 14 }, {
       heading(tr("ui.legend-edge")),
-      key(bar(COLOR.here), tr("ui.legend-edge-here")),
-      key(bar(COLOR.elsewhere), tr("ui.legend-edge-away")),
-      key(bar(COLOR.closed), tr("ui.legend-edge-closed")),
-      key(bar("outline_variant/0.6"), tr("ui.legend-edge-none")),
+      key(1, bar(COLOR.here), tr("ui.legend-edge-here")),
+      key(2, bar(COLOR.elsewhere), tr("ui.legend-edge-away")),
+      key(3, bar(COLOR.closed), tr("ui.legend-edge-closed")),
+      key(4, bar("outline_variant/0.6"), tr("ui.legend-edge-none")),
     }),
   })
 
@@ -912,11 +933,9 @@ local function mainView()
     -- A scroll that grows with the panel keeps the panel at whatever height
     -- it had, so the columns only scroll when they're estimated not to fit,
     -- in a scroll of fixed height.
-    tallestColumn(byScreen) > BODY_MAX_H
-      and ui.column({ height = BODY_MAX_H }, {
-        ui.scroll({ flexGrow = 1 }, { ui.row({ gap = COL_GAP, align = "start" }, columns) }),
-      })
-      or ui.row({ gap = COL_GAP, align = "start" }, columns),
+    scrolls
+      and ui.column({ height = BODY_MAX_H }, { ui.scroll({ flexGrow = 1 }, { body }) })
+      or body,
     lastRestore()
   ))
 end
