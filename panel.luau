@@ -9,6 +9,22 @@ local shared = require("./shared.luau")
 
 local tr = noctalia.tr
 
+-- A workspace is a number or, for a named workspace, "name:<name>".
+-- As a wsr.py argument: quoted, since names can have spaces.
+local function wsArg(id)
+  return shared.quote(tostring(id))
+end
+
+local wsLabel = shared.wsLabel
+
+local function wsLabels(ids)
+  local out = {}
+  for i, id in ipairs(ids or {}) do
+    out[i] = wsLabel(id)
+  end
+  return table.concat(out, ", ")
+end
+
 local PANEL_W = 1200 -- matches width in plugin.toml
 local CHROME = 16 -- the panel's own inner padding, on each side
 local PAD = 16
@@ -117,7 +133,7 @@ end
 local function setTick(ws, on)
   ws.ticked = on
   render()
-  shared.run("set-tick " .. (on and "1" or "0") .. " " .. ws.id, function()
+  shared.run("set-tick " .. (on and "1" or "0") .. " " .. wsArg(ws.id), function()
     refresh()
   end)
 end
@@ -125,7 +141,7 @@ end
 local function setAutoAdd(ws, on)
   ws.auto_add = on
   render()
-  shared.run("set-auto-add " .. (on and "1" or "0") .. " " .. ws.id, function()
+  shared.run("set-auto-add " .. (on and "1" or "0") .. " " .. wsArg(ws.id), function()
     refresh()
   end)
 end
@@ -161,7 +177,7 @@ function onWorkspaceDropped(payload, desc)
       if ws.pinned then
         noctalia.notify(tr("ui.title"), tr("ui.pinned-no-move"))
       elseif (ws.screen or ws.monitor_desc) ~= desc then
-        edit("move-workspace " .. ws.id .. " " .. shared.quote(desc))
+        edit("move-workspace " .. wsArg(ws.id) .. " " .. shared.quote(desc))
       end
       return
     end
@@ -175,7 +191,8 @@ local function typedNumbers()
   local pins = data.pins or {}
   for _, ws in ipairs(data.workspaces or {}) do
     -- The workspace using a saved number shares its id: count it once.
-    if ws.borrowed then
+    -- Named workspaces have no number to change.
+    if ws.borrowed or ws.named then
       continue
     end
     local text = numbers[ws.id] or tostring(ws.id)
@@ -229,7 +246,7 @@ local function applyNumbers()
   end
   local changes = {}
   for _, ws in ipairs(data.workspaces or {}) do
-    if ws.borrowed or ws.in_use then
+    if ws.borrowed or ws.in_use or ws.named then
       continue
     end
     if typed[ws.id] ~= ws.id then
@@ -256,7 +273,7 @@ local function openPicker(ws)
   query = ""
   candidates = nil
   render()
-  shared.run("candidates --ws " .. ws.id, function(d)
+  shared.run("candidates --ws " .. wsArg(ws.id), function(d)
     if adding == ws then
       candidates = d or { windows = {}, apps = {}, unsaved_here = 0 }
       render()
@@ -352,7 +369,7 @@ local function keywordRows(rows, w)
     if #also > 0 then
       local list = {}
       for _, id in ipairs(also) do
-        list[#list + 1] = tostring(id)
+        list[#list + 1] = wsLabel(id)
       end
       note(tr("ui.also-on", { app = app, ws = table.concat(list, ", ") }))
     end
@@ -382,8 +399,8 @@ end
 -- "Workspace 4", or "Workspace 4 · Work" when it has a name.
 local function workspaceTitle(ws)
   local name = tostring(ws.name or "")
-  if name == "" or name == tostring(ws.id) then
-    return tr("ui.workspace", { name = tostring(ws.id) })
+  if ws.named or name == "" or name == tostring(ws.id) then
+    return tr("ui.workspace", { name = wsLabel(ws.id) })
   end
   return tr("ui.workspace-named", { id = tostring(ws.id), name = name })
 end
@@ -412,8 +429,8 @@ local function appRows(rows, ws, i, w)
   local state = w.state or "closed"
   local tag, tip = tr("ui.state-here"), tr("ui.state-here-tooltip")
   if state == "elsewhere" then
-    tag = tr("ui.state-elsewhere", { ws = tostring(w.open_on) })
-    tip = tr("ui.state-elsewhere-tooltip", { ws = tostring(w.open_on) })
+    tag = tr("ui.state-elsewhere", { ws = wsLabel(w.open_on) })
+    tip = tr("ui.state-elsewhere-tooltip", { ws = wsLabel(w.open_on) })
   elseif state == "closed" then
     tag, tip = tr("ui.state-closed"), tr("ui.state-closed-tooltip")
   end
@@ -422,7 +439,7 @@ local function appRows(rows, ws, i, w)
       ui.button({ glyph = "x", variant = "outline", controlSize = "xs", tooltip = tr("ui.remove"),
                   enabled = not busy, onClick = function()
                     flushDrafts()
-                    edit("remove-window " .. ws.id .. " " .. i .. " " .. shared.quote(w.class))
+                    edit("remove-window " .. wsArg(ws.id) .. " " .. i .. " " .. shared.quote(w.class))
                   end }),
     })
   if w.keyword_key ~= nil then
@@ -438,17 +455,17 @@ local function unsavedRow(rows, ws, o)
   local buttons = {}
   if from ~= nil then
     buttons[#buttons + 1] = ui.button({ text = tr("ui.move-here"), variant = "outline", controlSize = "xs",
-      enabled = not busy, tooltip = tr("ui.move-app-tooltip", { app = tostring(o.label), ws = tostring(from.ws) }),
+      enabled = not busy, tooltip = tr("ui.move-app-tooltip", { app = tostring(o.label), ws = wsLabel(from.ws) }),
       onClick = function()
-        edit("move-window " .. ws.id .. " " .. from.ws .. " " .. from.index .. " " .. shared.quote(from.class))
+        edit("move-window " .. wsArg(ws.id) .. " " .. wsArg(from.ws) .. " " .. from.index .. " " .. shared.quote(from.class))
       end })
   end
   buttons[#buttons + 1] = ui.button({ text = tr("ui.add"), glyph = "plus", variant = "outline", controlSize = "xs",
     tooltip = tr(from ~= nil and "ui.add-also-tooltip" or "ui.add-suggestion",
-                 { app = tostring(o.label), ws = from and tostring(from.ws) or "" }),
+                 { app = tostring(o.label), ws = from and wsLabel(from.ws) or "" }),
     enabled = not busy,
-    onClick = function() edit("add-window " .. ws.id .. " --address " .. shared.quote(o.address)) end })
-  local tag = from ~= nil and tr("ui.state-saved-on", { ws = tostring(from.ws) }) or tr("ui.state-unsaved")
+    onClick = function() edit("add-window " .. wsArg(ws.id) .. " --address " .. shared.quote(o.address)) end })
+  local tag = from ~= nil and tr("ui.state-saved-on", { ws = wsLabel(from.ws) }) or tr("ui.state-unsaved")
   -- The key changes with the buttons: a row keeping its key while gaining
   -- a button was drawn twice.
   rows[#rows + 1] = appRow("sug-" .. o.address .. (from and "-move" or ""), COLOR.unsaved, o.icon, tostring(o.label), tostring(o.title or ""),
@@ -518,7 +535,7 @@ local function workspaceCard(ws, sc, width)
   local windows = ws.windows or {}
   local title = ui.label({ text = workspaceTitle(ws), fontSize = 14, fontWeight = "bold", maxLines = 1,
                           flexGrow = 1 })
-  if renumbering and not ws.in_use then
+  if renumbering and not ws.in_use and not ws.named then
     title = ui.row({ align = "center", gap = 6, flexGrow = 1 }, {
       ui.input({ key = "num-" .. ws.id, value = numbers[ws.id] or tostring(ws.id), width = 56,
                  controlSize = "sm", tooltip = tr("ui.number-tooltip"),
@@ -545,7 +562,7 @@ local function workspaceCard(ws, sc, width)
       }) or ui.button({ text = tr("ui.restore-now"), glyph = "restore", variant = "outline", controlSize = "sm",
                         enabled = sc.connected == true and #windows > 0 and not restoring(),
                         tooltip = tr(sc.connected and "ui.restore-now-tooltip" or "ui.restore-not-connected"),
-                        onClick = function() startRestore("--ws " .. ws.id) end })),
+                        onClick = function() startRestore("--ws " .. wsArg(ws.id)) end })),
       settled(ws) and ui.button({ glyph = "chevron-up", variant = "outline", controlSize = "xs", tooltip = tr("ui.less"),
                                   onClick = function()
                                     expanded[ws.id] = nil
@@ -564,7 +581,7 @@ local function workspaceCard(ws, sc, width)
     rows[#rows + 1] = ui.row({}, {
       ui.button({ text = tr("ui.new-number"), variant = "outline", controlSize = "xs", enabled = not busy,
                   tooltip = tr("ui.new-number-tooltip"),
-                  onClick = function() edit("renumber-saved " .. ws.id) end }),
+                  onClick = function() edit("renumber-saved " .. wsArg(ws.id)) end }),
     })
   end
   -- A workspace rule pins it: it can't be dragged or saved elsewhere.
@@ -587,7 +604,7 @@ local function workspaceCard(ws, sc, width)
       }),
       ui.button({ text = tr("ui.move-here"), variant = "outline", controlSize = "xs", enabled = not busy,
                   tooltip = tr("ui.move-screen-tooltip", { screen = here }),
-                  onClick = function() edit("set-monitor " .. ws.id) end }),
+                  onClick = function() edit("set-monitor " .. wsArg(ws.id)) end }),
     })
   end
   for i, w in ipairs(windows) do
@@ -654,7 +671,7 @@ local function borrowedCard(ws, width)
                              tr("ui.state-unsaved"), tr("ui.borrowed-app-tooltip", { ws = tostring(ws.id) }), {})
   end
   local function answer(state)
-    edit("set-identity " .. ws.id .. " " .. state)
+    edit("set-identity " .. wsArg(ws.id) .. " " .. state)
   end
   if asking then
     rows[#rows + 1] = ui.row({ align = "center", gap = 6 }, {
@@ -684,7 +701,7 @@ local function ghostCard(ws, sc, width)
       ui.button({ text = tr("ui.move-back-here"), variant = "outline", controlSize = "xs",
                   enabled = not busy and sc.connected == true,
                   tooltip = tr("ui.move-back-tooltip", { screen = screenTitle(sc) }),
-                  onClick = function() edit("move-workspace " .. ws.id .. " " .. shared.quote(sc.desc)) end }),
+                  onClick = function() edit("move-workspace " .. wsArg(ws.id) .. " " .. shared.quote(sc.desc)) end }),
     }),
     ui.label({ text = tr("ui.ghost", { now = now }), fontSize = 10, color = "on_surface_variant", maxLines = 2 }),
   })
@@ -755,13 +772,13 @@ local function lastRestore()
     parts[#parts + 1] = tr("ui.not-found", { apps = table.concat(r.unmatched, ", ") })
   end
   for _, a in ipairs(r.set_aside or {}) do
-    parts[#parts + 1] = noctalia.trp("ui.set-aside", tonumber(a.count) or 0, { ws = tostring(a.ws), from = tostring(a.from) })
+    parts[#parts + 1] = noctalia.trp("ui.set-aside", tonumber(a.count) or 0, { ws = wsLabel(a.ws), from = wsLabel(a.from) })
   end
   if #(r.in_use or {}) > 0 then
-    parts[#parts + 1] = tr("ui.skipped-in-use", { ws = table.concat(r.in_use, ", ") })
+    parts[#parts + 1] = tr("ui.skipped-in-use", { ws = wsLabels(r.in_use) })
   end
   if #(r.skipped or {}) > 0 then
-    parts[#parts + 1] = tr("ui.skipped", { ws = table.concat(r.skipped, ", ") })
+    parts[#parts + 1] = tr("ui.skipped", { ws = wsLabels(r.skipped) })
   end
   return ui.label({ text = table.concat(parts, " · "), fontSize = 11, color = "on_surface_variant", maxLines = 3 })
 end
@@ -843,7 +860,7 @@ local function mainView()
     hasApps = hasApps or #(ws.windows or {}) > 0
     if #(ws.windows or {}) > 0 and ws.in_place ~= true and not ws.in_use then
       allInPlace = false
-      outOfPlace[#outOfPlace + 1] = tostring(ws.id)
+      outOfPlace[#outOfPlace + 1] = wsLabel(ws.id)
     end
   end
   -- At most MAX_COLS screens side by side; more go on further rows, so
@@ -1029,20 +1046,20 @@ local function pickerView()
   local unsaved = tonumber(candidates.unsaved_here) or 0
   if unsaved > 0 and noctalia.string.trim(query) == "" then
     addAll = ui.button({ text = noctalia.trp("ui.add-all-open", unsaved), glyph = "plus", variant = "primary",
-                         controlSize = "sm", onClick = function() add("add-open " .. ws.id) end })
+                         controlSize = "sm", onClick = function() add("add-open " .. wsArg(ws.id)) end })
   end
   local winRows = {}
   for _, w in ipairs(search(candidates.windows, function(w) return w.label .. " " .. w.title end)) do
     local where = w.ws == ws.id and tr("ui.on-this-workspace", { title = tostring(w.title) })
-      or tr("ui.on-workspace", { ws = tostring(w.ws), title = tostring(w.title) })
+      or tr("ui.on-workspace", { ws = wsLabel(w.ws), title = tostring(w.title) })
     winRows[#winRows + 1] = pickRow("pw-" .. w.address, w.icon, tostring(w.label), where, w.saved_here == true,
-      function() add("add-window " .. ws.id .. " --address " .. shared.quote(w.address)) end, w.listed == true)
+      function() add("add-window " .. wsArg(ws.id) .. " --address " .. shared.quote(w.address)) end, w.listed == true)
   end
   local appRowsList = {}
   for _, a in ipairs(search(candidates.apps, function(a) return a.name .. " " .. a.id end)) do
     local about = (a.about or "") ~= "" and a.about or tostring(a.command)
     appRowsList[#appRowsList + 1] = pickRow("pa-" .. a.id, a.id, tostring(a.name), about, a.saved_here == true,
-      function() add("add-window " .. ws.id .. " --desktop " .. shared.quote(a.id)) end)
+      function() add("add-window " .. wsArg(ws.id) .. " --desktop " .. shared.quote(a.id)) end)
   end
 
   return ui.column({ gap = 12, padding = PAD, flexGrow = 1, align = "stretch" }, {
