@@ -13,6 +13,13 @@ local function quote(s)
 end
 M.quote = quote
 
+-- A workspace as people read it: 3, or Web for a named workspace
+-- ("name:Web", as wsr.py knows it).
+function M.wsLabel(id)
+  local s = tostring(id)
+  return if s:sub(1, 5) == "name:" then s:sub(6) else s
+end
+
 -- Runs `wsr.py <args>` and hands the decoded JSON output (or nil) to cb.
 function M.run(args, cb)
   noctalia.runAsync(script() .. " " .. args, function(result)

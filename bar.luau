@@ -50,7 +50,7 @@ function update()
     if #added > 0 then
       local names = {}
       for _, a in ipairs(added) do
-        names[#names + 1] = noctalia.tr("ui.added-one", { app = tostring(a.label or a.class), ws = tostring(a.ws) })
+        names[#names + 1] = noctalia.tr("ui.added-one", { app = tostring(a.label or a.class), ws = shared.wsLabel(a.ws) })
       end
       noctalia.notify(noctalia.tr("ui.title"), table.concat(names, "\n"))
     end
