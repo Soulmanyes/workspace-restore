@@ -37,7 +37,7 @@ The panel has one column per screen, left to right (three per row; a fourth scre
 - **×** removes an app from the list. The app keeps running.
 - **Add app or window…** opens a picker with open windows on one side and installed apps on the other, with a search box. Picking an open window is the most reliable way to add an app: it records the exact launch command, Firefox profile or terminal command.
 - Each blue row has its own **Add** button. If the app is saved on another workspace and has no window open there, it says **saved on ws N** and offers **Move it here**, which moves it from that list to this one. When several saved windows of the app could be the one, such as two Firefox windows, the title words pick; if they can't, only **Add** is offered.
-- A workspace open on another screen than its saved one says **Saved on <screen>**. Restoring moves it back there; **Move it here** saves the screen it's on now instead. Its saved screen's column also shows a faded card for it, with **Move it back here**.
+- A workspace open on another screen than its saved one says **Saved on** *screen*. Restoring moves it back there; **Move it here** saves the screen it's on now instead. Its saved screen's column also shows a faded card for it, with **Move it back here**.
 - Drag a card by its grip onto another screen's column to move the workspace there now. That screen becomes its saved screen. Pinned workspaces (see below) can't be dragged.
 - **Restore now** restores the workspace right away. A workspace whose apps are all open on it, on its own screen, shows **✓ In place** instead.
 - Two settings, shown as checkboxes:
@@ -46,7 +46,7 @@ The panel has one column per screen, left to right (three per row; a fourth scre
 
 **Edit numbers and names** at the top turns each card's title into a number box and a name box. **Apply** gives the workspaces their new numbers and names: windows, app lists and settings stay on the same screen, only the numbers change. Names are set in Hyprland too, and restoring puts them back. It refuses while a number is used twice, or when a number is pinned to another screen.
 
-**Workspace rules** in your Hyprland config (`hyprctl workspacerules`) count. A workspace a rule pins to a screen shows **Pinned to <screen>** and a pin instead of the drag grip: it can't be dragged or saved on another screen, and restoring puts it on the pinned screen. A rule's `defaultName` is the workspace's name unless you give it another; restoring applies it when Hyprland didn't.
+**Workspace rules** in your Hyprland config (`hyprctl workspacerules`) count. A workspace a rule pins to a screen shows **Pinned to** *screen* and a pin instead of the drag grip: it can't be dragged or saved on another screen, and restoring puts it on the pinned screen. A rule's `defaultName` is the workspace's name unless you give it another; restoring applies it when Hyprland didn't.
 
 **Restore all now** at the top restores every workspace; hovering it lists the apps it would open. The note next to it says which workspaces aren't in place.
 
