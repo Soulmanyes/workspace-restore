@@ -34,6 +34,12 @@ function M.restore(args)
   noctalia.runAsync("setsid -f " .. script() .. " restore " .. args .. " >/dev/null 2>&1", function() end)
 end
 
+-- The watcher follows Hyprland's events for the session. Starting it when
+-- one already runs is a no-op; it quits by itself when the bar stops calling.
+function M.watch()
+  noctalia.runAsync("setsid -f " .. script() .. " watch >/dev/null 2>&1", function() end)
+end
+
 function M.status(cb)
   M.run("status", cb)
 end
